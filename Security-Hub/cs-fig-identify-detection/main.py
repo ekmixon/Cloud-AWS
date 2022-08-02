@@ -32,10 +32,7 @@ def lambda_handler(event, context):
     # Check for our debug flag
     try:
         debug = os.environ["DEBUG"]
-        if "t" in str(debug).lower():
-            debug = True
-        else:
-            debug = False
+        debug = "t" in str(debug).lower()
     except KeyError:
         debug = False
 

@@ -73,7 +73,7 @@ Scanner = QuickScan(auth_object=auth)
 
 
 # Main routine
-def lambda_handler(event, _):  # pylint: disable=R0912,R0914,R0915
+def lambda_handler(event, _):    # pylint: disable=R0912,R0914,R0915
     """Lambda execution entry point."""
     bucket_name = event['Records'][0]['s3']['bucket']['name']
     bucket = s3.Bucket(bucket_name)
@@ -125,18 +125,14 @@ def lambda_handler(event, _):  # pylint: disable=R0912,R0914,R0915
                     if "error" in result:
                         # Error occurred
                         scan_msg = f"Scan error for {key}: {result['error']}"
-                        log.info(scan_msg)
                     else:
                         # Undertermined scan failure
                         scan_msg = f"Unable to scan {key}"
-                        log.info(scan_msg)
+                    log.info(scan_msg)
                 elif "malware" in result["verdict"]:
                     # Mitigation would trigger from here
                     scan_msg = f"Verdict for {key}: {result['verdict']}"
-                    detection = {}
-                    detection["sha"] = upload_sha
-                    detection["bucket"] = bucket_name
-                    detection["file"] = key
+                    detection = {"sha": upload_sha, "bucket": bucket_name, "file": key}
                     manifest = generate_manifest(detection, region)
                     _ = send_to_security_hub(manifest, region)
                     log.warning(scan_msg)

@@ -31,11 +31,10 @@ def set_auth_header(auth_token: str) -> dict:
     :param auth_token
     :return: dict
     """
-    headers = {
+    return {
         "Content-Type": "application/json",
-        "Authorization": "Bearer " + auth_token,
+        "Authorization": f"Bearer {auth_token}",
     }
-    return headers
 
 
 def check_account_access(auth_token: str, accounts: list) -> list:
@@ -50,20 +49,21 @@ def check_account_access(auth_token: str, accounts: list) -> list:
 
     Example check_account_access (token, ['12344667', '345678865'])
     """
-    if len(accounts) > 0:
+    if accounts:
         params = []
         for account in accounts:
-            params.append("ids=" + account)
+            params.append(f"ids={account}")
             param_string = "&".join(params)
-    url = "https://api.crowdstrike.com/cloud-connect-aws/entities/verify-account-access/v1?" + param_string
+    url = f"https://api.crowdstrike.com/cloud-connect-aws/entities/verify-account-access/v1?{param_string}"
+
     headers = set_auth_header(auth_token)
-    logger.debug("url:" + url)
-    logger.debug("headers:" + json.dumps(headers, indent=2))
+    logger.debug(f"url:{url}")
+    logger.debug(f"headers:{json.dumps(headers, indent=2)}")
     try:
         r = requests.post(url, headers=headers)
         r.raise_for_status()
     except requests.exceptions.HTTPError as err:
-        logger.debug("HTTP error {} calling {}".format(err, url))
+        logger.debug(f"HTTP error {err} calling {url}")
         return
     except Exception as e:
         logger.debug("Failed to verify accounts")
@@ -80,12 +80,11 @@ def get_falcon_discover_accounts(sortby=None, filterby=None) -> bool:
     url = "https://api.crowdstrike.com/cloud-connect-aws/combined/accounts/v1"
     PARAMS = {"limit": "100"}
     if filterby:
-        PARAMS.update({"filter": filterby})
+        PARAMS["filter"] = filterby
     if sortby:
-        PARAMS.update({"sort": sortby})
+        PARAMS["sort"] = sortby
 
-    auth_token = get_auth_token()
-    if auth_token:
+    if auth_token := get_auth_token():
         auth_header = get_auth_header(auth_token)
     else:
         print("Failed to get auth token")
@@ -93,75 +92,49 @@ def get_falcon_discover_accounts(sortby=None, filterby=None) -> bool:
     headers = {
         "Content-Type": "application/json",
     }
-    headers.update(auth_header)
+    headers |= auth_header
 
     try:
         response = requests.request("GET", url, headers=headers, params=PARAMS)
         response_content = json.loads(response.text)
-        logger.debug("Response to register = {}".format(response_content))
+        logger.debug(f"Response to register = {response_content}")
         return response_content
     except Exception as e:
-        logger.debug("Got exception {}".format(e))
+        logger.debug(f"Got exception {e}")
         return
 
 
 def check_accounts():
-    response_content = get_falcon_discover_accounts()
-    if response_content:
+    if response_content := get_falcon_discover_accounts():
         accounts_list = response_content["resources"]
         with open('accounts-status.json', 'w+') as f:
             json.dump(accounts_list, f)
-        accounts_to_test = []
-        for account in accounts_list:
-            accounts_to_test.append(account['id'])
-            # print(json.dumps(account, indent=4))
+        accounts_to_test = [account['id'] for account in accounts_list]
         auth_token = get_auth_token()
-        if auth_token:
-            pass
-            # results = check_account_access(auth_token, accounts_to_test)
-        else:
+        if not auth_token:
             print("Failed to get auth token")
             sys.exit(1)
-        # Waiting for API Fix
-        #
-        # for result in results:
-        #     if result.get('successful'):
-        #         print(f'Account {result.get("id")} is ok!')
-        #     else:
-        #         print(f'Account {result.get("id")} has a problem {result.get("reason")}')
-        #         account_values_to_check = {
-        #             'id': account.get('id'),
-        #             'iam_role_arn': account.get('iam_role_arn'),
-        #             'external_id': account.get('external_id'),
-        #             'cloudtrail_bucket_owner_id': account.get('cloudtrail_bucket_owner_id'),
-        #             'cloudtrail_bucket_region': account.get('cloudtrail_bucket_region'),
-        #         }
-        #         print(f'Current settings {json.dumps(account_values_to_check, indent=4)}')
     else:
         error_code = response_content.status_code
         error_msg = response_content["errors"][0]["message"]
-        logger.info(
-            "Got response error code {} message {}".format(error_code, error_msg)
-        )
+        logger.info(f"Got response error code {error_code} message {error_msg}")
         return
 
 
 def get_auth_header(auth_token) -> str:
     if auth_token:
-        auth_header = "Bearer " + auth_token
-        headers = {"Authorization": auth_header}
-        return headers
+        auth_header = f"Bearer {auth_token}"
+        return {"Authorization": auth_header}
 
 
 def get_auth_token():
     url = "https://api.crowdstrike.com/oauth2/token"
-    payload = "client_secret=" + falcon_client_secret + "&client_id=" + falcon_client_id
+    payload = f"client_secret={falcon_client_secret}&client_id={falcon_client_id}"
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     response = requests.request("POST", url, headers=headers, data=payload)
     if response.ok:
         response_object = response.json()
-        token = response_object.get("access_token", "")
-        if token:
+        if token := response_object.get("access_token", ""):
             return token
     return
 

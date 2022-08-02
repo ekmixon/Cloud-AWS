@@ -25,11 +25,20 @@ class APIHarness:
         self.token_expiration = 0
         self.token_renew_window = 20
         self.token_time = time.time()
-        self.token_expired = lambda: True if (time.time() - self.token_time) >= (
-            self.token_expiration - self.token_renew_window) else False
+        self.token_expired = (
+            lambda: time.time() - self.token_time
+            >= self.token_expiration - self.token_renew_window
+        )
+
         self.authenticated = False
-        self.valid_cred_format = lambda: True if "client_id" in self.creds and "client_secret" in self.creds else False
-        self.headers = lambda: {'Authorization': 'Bearer {}'.format(self.token)} if self.token else {}
+        self.valid_cred_format = (
+            lambda: "client_id" in self.creds and "client_secret" in self.creds
+        )
+
+        self.headers = (
+            lambda: {'Authorization': f'Bearer {self.token}'} if self.token else {}
+        )
+
         # This is a list of available commands, additional endpoints (commands) can be added ad-hoc
         # [Command Name, HTTP Method, Endpoint]
         self.commands = [
@@ -324,7 +333,7 @@ class APIHarness:
 
     def authenticate(self):
         """ Generates an authorization token. """
-        FULL_URL = self.base_url + '/oauth2/token'
+        FULL_URL = f'{self.base_url}/oauth2/token'
         DATA = {}
         if self.valid_cred_format():
             DATA = {
@@ -345,9 +354,9 @@ class APIHarness:
 
     def deauthenticate(self):
         """ Revokes the specified authorization token. """
-        FULL_URL = self.base_url + '/oauth2/revoke'
-        HEADERS = {'Authorization': 'basic {}'.format(self.token)}
-        DATA = {'token': '{}'.format(self.token)}
+        FULL_URL = f'{self.base_url}/oauth2/revoke'
+        HEADERS = {'Authorization': f'basic {self.token}'}
+        DATA = {'token': f'{self.token}'}
         revoked = False
         try:
             requests.request("POST", FULL_URL, data=DATA, headers=HEADERS, verify=False)
@@ -367,7 +376,7 @@ class APIHarness:
         else:
             CMD = [a for a in self.commands if a[0] == action]
         if CMD:
-            FULL_URL = self.base_url + "{}".format(CMD[0][2])
+            FULL_URL = self.base_url + f"{CMD[0][2]}"
             if ids:
                 ID_LIST = str(ids).replace(",", "&ids=")
                 FULL_URL = FULL_URL.format(ID_LIST)

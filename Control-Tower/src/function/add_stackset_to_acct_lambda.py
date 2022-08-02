@@ -30,13 +30,13 @@ def lambda_handler(event, context):
             for item in stackset_list:
                 try:
                     CFT.create_stack_instances(StackSetName=item, Accounts=[accId], Regions=[regionName])
-                    logger.info('Processed {} Sucessfully'.format(item))
+                    logger.info(f'Processed {item} Sucessfully')
 
                 except Exception as e:
-                    logger.error('Unable to launch in:{}, REASON: {}'.format(item, e))
+                    logger.error(f'Unable to launch in:{item}, REASON: {e}')
         else:
             '''Unsucessful event recieved'''
-            logger.info('Unsucessful Event Recieved. SKIPPING :{}'.format(event))
+            logger.info(f'Unsucessful Event Recieved. SKIPPING :{event}')
             return (False)
     else:
-        logger.info('Control Tower Event Captured :{}'.format(event))
+        logger.info(f'Control Tower Event Captured :{event}')

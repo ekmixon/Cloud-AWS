@@ -12,39 +12,37 @@ def handleRecord(decoded_line):
     except KeyError:
         # Default to confirm the instance exists in the account (Non-MSSP)
         confirm = "True"
-    if confirm.lower() != "false":
-        if "instance_id" in decoded_line:
-            region, instance = getInstance(decoded_line["instance_id"], decoded_line["detected_mac_address"])
-            try:
-                for iface in instance.network_interfaces:
-                    decoded_line["vpc_id"] = instance.vpc_id
-                    decoded_line["subnet_id"] = instance.subnet_id
-                    decoded_line["image_id"] = instance.image_id
-                    decoded_line["eni_id"] = iface.id
-                    # Try and grab the instance name tag
-                    try:
-                        for tag in instance.tags:
-                            if "name" in tag["Key"].lower():
-                                decoded_line["instance_name"] = tag["Value"]
-                    except (AttributeError, IndexError, KeyError):
-                        decoded_line["instance_name"] = "Unnamed instance"
-
-                send = True
-
-            except ClientError:
-                # Not our instance
-                i_id = decoded_line["instance_id"]
-                mac = decoded_line["mac_address"]
-                e_msg = f"Instance {i_id} with MAC address {mac} not found in regions searched. Alert not processed."
-                send_result = {"Error": e_msg}
-        else:
-            e_msg = "Instance ID not provided. Alert not processed."
-            send_result = {"Error": e_msg}
-
-    else:
+    if confirm.lower() == "false":
         # We are not confirming instances, so we cannot identify it's region. Use our reporting region instead.
         region = cur_region
         send = True
+
+    elif "instance_id" in decoded_line:
+        region, instance = getInstance(decoded_line["instance_id"], decoded_line["detected_mac_address"])
+        try:
+            for iface in instance.network_interfaces:
+                decoded_line["vpc_id"] = instance.vpc_id
+                decoded_line["subnet_id"] = instance.subnet_id
+                decoded_line["image_id"] = instance.image_id
+                decoded_line["eni_id"] = iface.id
+                # Try and grab the instance name tag
+                try:
+                    for tag in instance.tags:
+                        if "name" in tag["Key"].lower():
+                            decoded_line["instance_name"] = tag["Value"]
+                except (AttributeError, IndexError, KeyError):
+                    decoded_line["instance_name"] = "Unnamed instance"
+
+            send = True
+
+        except ClientError:
+            # Not our instance
+            i_id = decoded_line["instance_id"]
+            mac = decoded_line["mac_address"]
+            e_msg = f"Instance {i_id} with MAC address {mac} not found in regions searched. Alert not processed."
+            send_result = {"Error": e_msg}
+    else:
+        send_result = {"Error": "Instance ID not provided. Alert not processed."}
 
     if send:
         send_result = sendToSecurityHub(generateManifest(decoded_line, cur_region, region), cur_region)
@@ -55,9 +53,11 @@ def handleRecord(decoded_line):
 def generateManifest(detection_event, region, det_region):
     manifest = {}
     if "gov" in region:
-        ARN = "arn:aws-us-gov:securityhub:{}:358431324613:product/crowdstrike/crowdstrike-falcon".format(region)
+        ARN = f"arn:aws-us-gov:securityhub:{region}:358431324613:product/crowdstrike/crowdstrike-falcon"
+
     else:
-        ARN = "arn:aws:securityhub:{}:517716713836:product/crowdstrike/crowdstrike-falcon".format(region)
+        ARN = f"arn:aws:securityhub:{region}:517716713836:product/crowdstrike/crowdstrike-falcon"
+
     try:
         manifest["SchemaVersion"] = "2018-10-08"
         manifest["ProductArn"] = f"{ARN}"
@@ -73,7 +73,7 @@ def generateManifest(detection_event, region, det_region):
         manifest["Severity"] = {"Product": severityProduct, "Normalized": severityNormalized}
         if "instance_id" in detection_event:
             manifest["Id"] = detection_event["instance_id"] + detection_event["detection_id"]
-            manifest["Title"] = "Falcon Alert. Instance: %s" % detection_event["instance_id"]
+            manifest["Title"] = f'Falcon Alert. Instance: {detection_event["instance_id"]}'
             manifest["Resources"] = [{"Type": "AwsEc2Instance", "Id": detection_event["instance_id"], "Region": det_region}]
         else:
             manifest["Id"] = f"UnknownInstanceID:{detection_event['detection_id']}"
@@ -95,10 +95,12 @@ def generateManifest(detection_event, region, det_region):
         print("Could not translate info for event %s\n%s" % (detection_event["detection_id"], traceback.format_exc()))
         return
     try:
-        manifest["Types"] = ["Namespace: TTPs",
-                             "Category: %s" % detection_event["tactic"],
-                             "Classifier: %s" % detection_event["technique"]
-                             ]
+        manifest["Types"] = [
+            "Namespace: TTPs",
+            f'Category: {detection_event["tactic"]}',
+            f'Classifier: {detection_event["technique"]}',
+        ]
+
     except Exception:
         pass
     if "Process" in detection_event:
@@ -137,7 +139,7 @@ def getInstance(instance_id, mac_address):
         except Exception:
             # Something untoward has occurred, throw the error in the log
             tb = traceback.format_exc()
-            print(str(tb))
+            print(tb)
             continue
 
     return region, ec2instance
@@ -149,7 +151,7 @@ def sendToSecurityHub(manifest, region):
     found = False
     try:
         check_response = client.get_findings(Filters={'Id': [{'Value': manifest["Id"], 'Comparison': 'EQUALS'}]})
-        for finding in check_response["Findings"]:
+        for _ in check_response["Findings"]:
             found = True
     except Exception:
         pass
@@ -160,10 +162,10 @@ def sendToSecurityHub(manifest, region):
             import_response = client.batch_import_findings(Findings=[manifest])
         except ClientError as err:
             # Boto3 issue communicating with SH, throw the error in the log
-            print(str(err))
+            print(err)
         except Exception:
             # Unknown error / issue, log the result
             tb = traceback.format_exc()
-            print(str(tb))
+            print(tb)
 
     return import_response

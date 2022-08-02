@@ -50,7 +50,7 @@ def get_auth_token(client_id, client_secret):
 
         url = "https://api.crowdstrike.com/oauth2/token"
 
-        payload = 'client_secret=' + client_secret + '&client_id=' + client_id
+        payload = f'client_secret={client_secret}&client_id={client_id}'
         headers = {
             'Content-Type': 'application/x-www-form-urlencoded'
         }
@@ -58,23 +58,19 @@ def get_auth_token(client_id, client_secret):
         response = requests.request("POST", url, headers=headers, data=payload)
         if response.ok:
             response_object = (response.json())
-            token = response_object.get('access_token', '')
-            if token:
+            if token := response_object.get('access_token', ''):
                 return token
             else:
                 return
     except Exception as e:
-        logger.info('Got Exception {} getting auth token'.format(e))
+        logger.info(f'Got Exception {e} getting auth token')
         return
 
 
 def get_auth_header(_auth_token: str) -> dict:
     if _auth_token:
-        _auth_header = "Bearer " + _auth_token
-        _headers = {
-            "Authorization": _auth_header
-        }
-        return _headers
+        _auth_header = f"Bearer {_auth_token}"
+        return {"Authorization": _auth_header}
 
 
 def manage_falcon_host(aid: list, action: str, falcon_id, falcon_secret) -> bool:
@@ -84,7 +80,8 @@ def manage_falcon_host(aid: list, action: str, falcon_id, falcon_secret) -> bool
     :param action:
     :return:
     """
-    url = "https://api.crowdstrike.com/devices/entities/devices-actions/v2?action_name=" + action
+    url = f"https://api.crowdstrike.com/devices/entities/devices-actions/v2?action_name={action}"
+
     payload = json.dumps({"ids": aid})
     _auth_token = get_auth_token(falcon_id, falcon_secret)
     _auth_header = get_auth_header(_auth_token)
@@ -92,17 +89,16 @@ def manage_falcon_host(aid: list, action: str, falcon_id, falcon_secret) -> bool
 
         'Content-Type': 'application/json',
     }
-    headers.update(_auth_header)
+    headers |= _auth_header
     try:
         response = requests.request("POST", url, headers=headers, data=payload)
-        logger.info('Delete request response was {}'.format(response))
-        if response.status_code == 202:
-            logger.info('Deleted instance {}'.format(aid))
-            return True
-        else:
+        logger.info(f'Delete request response was {response}')
+        if response.status_code != 202:
             return False
+        logger.info(f'Deleted instance {aid}')
+        return True
     except Exception as e:
-        logger.info('Got exception {} hiding host'.format(e))
+        logger.info(f'Got exception {e} hiding host')
         return False
 
 
@@ -144,7 +140,7 @@ def lifecycle_hook_abandon(asg_message):
             LifecycleActionToken=asg_message['LifecycleActionToken'],
             LifecycleActionResult=result)
     except Exception as e:
-        logger.error("[complete_lifecycle_action]: {}".format(e))
+        logger.error(f"[complete_lifecycle_action]: {e}")
 
 
 def lifecycle_hook_success(asg_message):
@@ -166,7 +162,7 @@ def lifecycle_hook_success(asg_message):
             LifecycleActionToken=asg_message['LifecycleActionToken'],
             LifecycleActionResult=result)
     except Exception as e:
-        logger.error("[complete_lifecycle_action]: {}".format(e))
+        logger.error(f"[complete_lifecycle_action]: {e}")
         return False
     return True
 
@@ -193,14 +189,14 @@ def lambda_handler(event, context):
     logger.setLevel(logging.INFO)
 
     event_type = ""
-    logger.info('Got event {}'.format(event))
+    logger.info(f'Got event {event}')
 
     event_type = ""
 
     # Coming here via Sns?
     if ('Records' in event):
         message = json.loads(event['Records'][0]['Sns']['Message'])
-        logger.info("[MESSAGE]: {}".format(message))
+        logger.info(f"[MESSAGE]: {message}")
         if 'Event' in message:
             if (message.get('Event') == "autoscaling:TEST_NOTIFICATION"):
                 logger.info("[INFO]: GOT TEST NOTIFICATION. Do nothing")
@@ -212,14 +208,12 @@ def lambda_handler(event, context):
             elif (message.get('Event') == "autoscaling:EC2_INSTANCE_TERMINATE"):
                 logger.info("[INFO]: GOT terminate notification....will get terminating event from lifecyclehook")
                 return
-            elif (message.get('Event') == "autoscaling:EC2_INSTANCE_TERMINATE_ERROR"):
+            elif message.get('Event') == "autoscaling:EC2_INSTANCE_TERMINATE_ERROR":
                 logger.info("[INFO]: GOT a GW terminate error...raise exception for now")
                 raise Exception("Failed to terminate a GW in an autoscale event")
-                return
-            elif (message.get('Event') == "autoscaling:EC2_INSTANCE_LAUNCH_ERROR"):
+            elif message.get('Event') == "autoscaling:EC2_INSTANCE_LAUNCH_ERROR":
                 logger.info("[INFO]: GOT a GW launch error...raise exception for now")
                 raise Exception("Failed to launch a GW in an autoscale event")
-                return
         elif 'LifecycleTransition' in message:
             if (message.get('LifecycleTransition') == "autoscaling:EC2_INSTANCE_LAUNCHING"):
                 logger.info("[INFO] Lifecyclehook Launching\n")
@@ -233,18 +227,15 @@ def lambda_handler(event, context):
     else:
         logger.info("[ERROR]: Something else entirely")
         raise Exception("[ERROR]: Something else entirely")
-        return
-
-    logger.info('Message that we are parsing is {}'.format(message))
-    logger.info('event_type is {}'.format(event_type))
+    logger.info(f'Message that we are parsing is {message}')
+    logger.info(f'event_type is {event_type}')
 
     lifecycle_hook_name = message['LifecycleHookName']
     asg_name = message['AutoScalingGroupName']
     ec2_instanceid = message['EC2InstanceId']
-    logger.info('ec2_instanceid: ' + ec2_instanceid)
+    logger.info(f'ec2_instanceid: {ec2_instanceid}')
 
     if event_type == 'terminate':
-
         host_query_filter = "platform_name: 'Linux' + instance_id: '" + ec2_instanceid + "'"
         # For the demo we will api keys in env variables but this should be changed to store the keys in ssm
         # client_id = get_ssm_secure_string('Falcon_ClientID')['Parameter']['Value']
@@ -252,20 +243,11 @@ def lambda_handler(event, context):
         #
         client_id = os.environ['Falcon_ClientID']
         client_secret = os.environ['Falcon_Secret']
-        #
-        # Change the above to use SSM
-        #
-        auth_token = get_auth_token(client_id, client_secret)
-        if auth_token:
-            auth_header = "Bearer " + auth_token
+        if auth_token := get_auth_token(client_id, client_secret):
+            auth_header = f"Bearer {auth_token}"
         falcon_aid = query_falcon_host(auth_header, host_query_filter)
-        logger.info('Falcon aid is {}'.format(falcon_aid))
+        logger.info(f'Falcon aid is {falcon_aid}')
         host_action = 'hide_host'
-        logger.info('Calling manage_falcon_host {}{}'.format(falcon_aid, host_action))
+        logger.info(f'Calling manage_falcon_host {falcon_aid}{host_action}')
         manage_falcon_host([falcon_aid], host_action, client_id, client_secret)
-        lifecycle_hook_success(message)
-
-    elif event_type == 'launch':
-        lifecycle_hook_success(message)
-    else:
-        lifecycle_hook_success(message)
+    lifecycle_hook_success(message)

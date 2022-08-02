@@ -9,7 +9,7 @@ logger.setLevel(level=logging.INFO)
 
 
 def lambda_handler(event, context):
-    logger.info('Got event {}'.format(event))
+    logger.info(f'Got event {event}')
     try:
         properties = event['ResourceProperties']
         region = os.environ['AWS_REGION']
@@ -30,5 +30,5 @@ def lambda_handler(event, context):
             )
             cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
     except Exception as e:
-        logger.info('Got exception adding action {}'.format(e))
+        logger.info(f'Got exception adding action {e}')
         cfnresponse.send(event, context, cfnresponse.FAILED, {})

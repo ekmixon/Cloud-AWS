@@ -21,11 +21,17 @@ def cfnresponse_send(event, context, responseStatus, responseData, physicalResou
     responseUrl = event['ResponseURL']
     print(responseUrl)
 
-    responseBody = {'Status': responseStatus,
-                    'Reason': 'See the details in CloudWatch Log Stream: ' + context.log_stream_name,
-                    'PhysicalResourceId': physicalResourceId or context.log_stream_name, 'StackId': event['StackId'],
-                    'RequestId': event['RequestId'], 'LogicalResourceId': event['LogicalResourceId'], 'NoEcho': noEcho,
-                    'Data': responseData}
+    responseBody = {
+        'Status': responseStatus,
+        'Reason': f'See the details in CloudWatch Log Stream: {context.log_stream_name}',
+        'PhysicalResourceId': physicalResourceId or context.log_stream_name,
+        'StackId': event['StackId'],
+        'RequestId': event['RequestId'],
+        'LogicalResourceId': event['LogicalResourceId'],
+        'NoEcho': noEcho,
+        'Data': responseData,
+    }
+
 
     json_responseBody = json.dumps(responseBody)
 
@@ -40,9 +46,9 @@ def cfnresponse_send(event, context, responseStatus, responseData, physicalResou
         response = requests.put(responseUrl,
                                 data=json_responseBody,
                                 headers=headers)
-        print("Status code: " + response.reason)
+        print(f"Status code: {response.reason}")
     except Exception as e:
-        print("send(..) failed executing requests.put(..): " + str(e))
+        print(f"send(..) failed executing requests.put(..): {str(e)}")
 
 
 def get_secret_value(secret):
@@ -102,16 +108,16 @@ def launch_crwd_discover(templateUrl, paramList, AdminRoleARN, ExecRole, cList, 
             if e.response['Error']['Code'] == 'NameAlreadyExistsException':
                 logger.info("StackSet already exists")
                 result['StackSetName'] = 'CRWD-ROLES-CREATION'
-                return result
             else:
-                logger.error("Unexpected error: %s" % e)
+                logger.error(f"Unexpected error: {e}")
                 result['Status'] = e
-                return result
+
+            return result
 
 
 def get_random_alphanum_string(stringLength=15):
     lettersAndDigits = string.ascii_letters + string.digits
-    return ''.join((random.choice(lettersAndDigits) for i in range(stringLength)))
+    return ''.join(random.choice(lettersAndDigits) for _ in range(stringLength))
 
 
 def delete_stackset(stacksetName):
@@ -126,7 +132,10 @@ def delete_stackset(stacksetName):
                 stackset_instances["Summaries"].extend(morestackinstances["Summaries"])
             if len(stackset_instances["Summaries"]) > 0:
                 stack_instance_members = [x["Account"] for x in stackset_instances["Summaries"]]
-                stack_instance_regions = list(set(x["Region"] for x in stackset_instances["Summaries"]))
+                stack_instance_regions = list(
+                    {x["Region"] for x in stackset_instances["Summaries"]}
+                )
+
                 CFT.delete_stack_instances(
                     StackSetName=stacksetName,
                     Accounts=stack_instance_members,
@@ -137,24 +146,26 @@ def delete_stackset(stacksetName):
             stackset_instances = CFT.list_stack_instances(StackSetName=stacksetName)
             counter = 2
             while len(stackset_instances["Summaries"]) > 0 and counter > 0:
-                logger.info("Deleting stackset instance from {}, remaining {}, "
-                            "sleeping for 10 sec".format(stacksetName, len(stackset_instances["Summaries"])))
+                logger.info(
+                    f'Deleting stackset instance from {stacksetName}, remaining {len(stackset_instances["Summaries"])}, sleeping for 10 sec'
+                )
+
                 time.sleep(10)
-                counter = counter - 1
+                counter -= 1
                 stackset_instances = CFT.list_stack_instances(StackSetName=stacksetName)
             if counter > 0:
                 CFT.delete_stack_set(StackSetName=stacksetName)
-                logger.info("StackSet {} deleted".format(stacksetName))
+                logger.info(f"StackSet {stacksetName} deleted")
             else:
-                logger.info("StackSet {} still has stackset instance, skipping".format(stacksetName))
+                logger.info(f"StackSet {stacksetName} still has stackset instance, skipping")
             return True
 
     except ClientError as e:
         if e.response['Error']['Code'] == 'StackSetNotFoundException':
-            logger.info("StackSet {} does not exist".format(stacksetName))
+            logger.info(f"StackSet {stacksetName} does not exist")
             return True
         else:
-            logger.error("Unexpected error: %s" % e)
+            logger.error(f"Unexpected error: {e}")
             return False
 
 
@@ -178,9 +189,9 @@ def lambda_handler(event, context):
         CrowdstrikeTemplateUrl = f'https://crowdstrike-sa-resources-ct-{AwsRegion}.s3.amazonaws.com/ct_crowdstrike_stacksetv3.yaml'
         AccountId = get_master_id()
         cList = ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM', 'CAPABILITY_AUTO_EXPAND']
-        ExecRole = 'AWSControlTowerExecution'
-        AdminRoleARN = 'arn:aws:iam::' + AccountId + ':role/service-role/AWSControlTowerStackSetRole'
-        logger.info('EVENT Received: {}'.format(event))
+        AdminRoleARN = f'arn:aws:iam::{AccountId}:role/service-role/AWSControlTowerStackSetRole'
+
+        logger.info(f'EVENT Received: {event}')
 
         response_data = {}
 
@@ -225,23 +236,22 @@ def lambda_handler(event, context):
             keyDict['ParameterValue'] = LogArchiveAccount
             CRWD_Discover_paramList.append(dict(keyDict))
 
-            logger.info('CRWD_Discover ParamList:{}'.format(CRWD_Discover_paramList))
-            logger.info('AdminRoleARN: {}'.format(AdminRoleARN))
-            logger.info('CrowdstrikeTemplateUrl: {}'.format(CrowdstrikeTemplateUrl))
-            logger.info('ExecRole: {}'.format(ExecRole))
-            logger.info('ExecRole: {}'.format(cList))
+            logger.info(f'CRWD_Discover ParamList:{CRWD_Discover_paramList}')
+            logger.info(f'AdminRoleARN: {AdminRoleARN}')
+            logger.info(f'CrowdstrikeTemplateUrl: {CrowdstrikeTemplateUrl}')
+            ExecRole = 'AWSControlTowerExecution'
+            logger.info(f'ExecRole: {ExecRole}')
+            logger.info(f'ExecRole: {cList}')
 
             CRWD_Discover_result = launch_crwd_discover(CrowdstrikeTemplateUrl, CRWD_Discover_paramList, AdminRoleARN,
                                                         ExecRole, cList, STACKSETNAME)
-            logger.info('CRWD-Discover Stackset: {}'.format(CRWD_Discover_result))
+            logger.info(f'CRWD-Discover Stackset: {CRWD_Discover_result}')
 
             if CRWD_Discover_result:
                 cfnresponse_send(event, context, SUCCESS, CRWD_Discover_result, "CustomResourcePhysicalID")
-                return
             else:
                 cfnresponse_send(event, context, FAILED, CRWD_Discover_result, "CustomResourcePhysicalID")
-                return
-
+            return
         elif event['RequestType'] in ['Update']:
             logger.info('Event = ' + event['RequestType'])
 

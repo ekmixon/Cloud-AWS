@@ -48,8 +48,10 @@ def register_account(accounts):
     if register_response["status_code"] == 201:
         print("Successfully registered account(s).")
     else:
-        print("Registration failed with response: {} {}".format(register_response["status_code"],
-                                                                register_response["body"]["errors"][0]["message"]))
+        print(
+            f'Registration failed with response: {register_response["status_code"]} {register_response["body"]["errors"][0]["message"]}'
+        )
+
     return
 
 
@@ -60,8 +62,10 @@ def update_accounts(accounts):
     if update_response["status_code"] == 200:
         print("Successfully updated account(s).")
     else:
-        print("Update failed with response: {} {}".format(update_response["status_code"],
-                                                          update_response["body"]["errors"][0]["message"]))
+        print(
+            f'Update failed with response: {update_response["status_code"]} {update_response["body"]["errors"][0]["message"]}'
+        )
+
     return
 
 
@@ -95,14 +99,16 @@ if __name__ == "__main__":
     if command.lower() in "update,register":
         if (args.data_file is None):
             parser.error(
-                "The {} command requires the -d arguments to also be specified.".format(command))
+                f"The {command} command requires the -d arguments to also be specified."
+            )
+
         else:
             filename = args.data_file
             falcon_client_id = args.falcon_client_id
             falcon_client_secret = args.falcon_client_secret
     else:
-        parser.error("The {} command is not recognized.".format(command))
-        # These globals exist for all requests
+        parser.error(f"The {command} command is not recognized.")
+            # These globals exist for all requests
 
     accounts = import_accounts_from_file(filename)
 
@@ -123,6 +129,6 @@ if __name__ == "__main__":
                 print(f"{command} is not a valid command.")
         except Exception as e:
             # Handle any previously unhandled errors
-            print("Command failed with error: {}.".format(str(e)))
+            print(f"Command failed with error: {str(e)}.")
         # Discard our token before we exit
         falcon_discover.auth_object.revoke(falcon_discover.token)

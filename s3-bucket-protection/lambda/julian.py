@@ -90,7 +90,7 @@ def to_jd(dt: datetime, fmt: str = 'jd') -> float:
     return __to_format(jd, fmt)
 
 
-def from_jd(jd: float, fmt: str = 'jd') -> datetime:  # pylint: disable=R0914
+def from_jd(jd: float, fmt: str = 'jd') -> datetime:    # pylint: disable=R0914
     """
     Converts a Julian Date to a datetime object.
     Algorithm is from Fliegel and van Flandern (1968)
@@ -132,8 +132,14 @@ def from_jd(jd: float, fmt: str = 'jd') -> datetime:  # pylint: disable=R0914
     seconds = int(frac_component // 1e6)
     frac_component -= seconds*1e6
 
-    frac_component = int(frac_component)
+    frac_component = frac_component
 
-    dt = datetime(year=year, month=month, day=day,
-                  hour=hours, minute=minutes, second=seconds, microsecond=frac_component)
-    return dt
+    return datetime(
+        year=year,
+        month=month,
+        day=day,
+        hour=hours,
+        minute=minutes,
+        second=seconds,
+        microsecond=frac_component,
+    )

@@ -70,15 +70,9 @@ class CredVault():  # pylint: disable=R0902
         self.api_base_url = self.get_parameter("FIG_API_BASE_URL")
         # Should we only alert on detections in AWS? - Defaults to True
         self.confirm_provider = self.get_parameter("FIG_CONFIRM_PROVIDER")
-        if "f" in self.confirm_provider.lower():
-            self.confirm_provider = False
-        else:
-            self.confirm_provider = True
+        self.confirm_provider = "f" not in self.confirm_provider.lower()
         # Should we enable SSL Verification for Request calls? - Defaults to True
         self.ssl_verify = self.get_parameter("FIG_SSL_VERIFY")
-        if "f" in self.ssl_verify.lower():
-            self.ssl_verify = False
-        else:
-            self.ssl_verify = True
+        self.ssl_verify = "f" not in self.ssl_verify.lower()
         del self.logger
         return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True)

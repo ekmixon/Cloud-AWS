@@ -40,8 +40,8 @@ s3 = boto3.client('s3')
 
 
 def lambda_handler(event, context):
-    logger.info('Got event {}'.format(event))
-    logger.info('Got context {}'.format(context))
+    logger.info(f'Got event {event}')
+    logger.info(f'Got context {context}')
 
     # Create an SNS client
     sns = boto3.client('sns')
@@ -52,4 +52,4 @@ def lambda_handler(event, context):
             TopicArn=topic,
             Message=json.dumps(event),
         )
-    logger.info('Publish response {}'.format(response))
+    logger.info(f'Publish response {response}')

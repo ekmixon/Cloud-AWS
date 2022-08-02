@@ -49,7 +49,7 @@ class Logger():
         try:
             with open(offset_file, "r", encoding="utf-8") as logfile:
                 offset = int(logfile.readline())
-        except (FileNotFoundError, OSError, ValueError):
+        except (OSError, ValueError):
             # Skip if we can't find the file or read it, we'll start at zero.
             pass
 

@@ -26,7 +26,7 @@ logging.getLogger().setLevel(logging.INFO)
 os_name = "Container"
 falcon_repo = 'falcon-container-sensor'
 download_path = "/tmp"
-output_file = download_path + "/" + falcon_repo + ".yaml"
+output_file = f"{download_path}/{falcon_repo}.yaml"
 
 
 # Verify docker is running
@@ -92,7 +92,7 @@ def download_latest_sensor(os_name: str, download_path: str):
         exit()
 
     # Download falcon-container-sensor
-    if not os.path.exists(download_path + "/" + file_name):
+    if not os.path.exists(f"{download_path}/{file_name}"):
         falcon.DownloadSensorInstallerById(
             parameters={
                 "id": latest_sha,
@@ -107,15 +107,14 @@ def download_latest_sensor(os_name: str, download_path: str):
 def import_container_sensor(download_path: str, file_name: str, repo_uri: str):
     "Import the sensor into the local repo from archive"
     # Extract version info for tag
-    with open(download_path + "/" + file_name, 'rb') as f:
+    with open(f"{download_path}/{file_name}", 'rb') as f:
         local_image = docker_client.images.load(f)
     image_name = local_image[0].tags[0]
     import_tag = image_name.split(":")[1]
     tag_pattern = r'(\d+\.){2}\d+-\d+'
     tag = re.search(tag_pattern, import_tag).group()
-    resp = local_image[0].tag(repository=repo_uri, tag=tag)
-    if resp:
-        log.info("Successfully tagged image " + image_name)
+    if resp := local_image[0].tag(repository=repo_uri, tag=tag):
+        log.info(f"Successfully tagged image {image_name}")
     else:
         log.error("Error tagging image")
         exit()
@@ -128,7 +127,7 @@ def create_ecr(falcon_repo: str):
     repo_names = [r['repositoryName'] for r in repos['repositories']]
 
     if falcon_repo not in repo_names:
-        log.info("creating repo " + falcon_repo)
+        log.info(f"creating repo {falcon_repo}")
         response = ecr_client.create_repository(
             repositoryName=falcon_repo,
             imageTagMutability='MUTABLE',
@@ -151,19 +150,19 @@ def push_image_ecr(ecr_repo_uri: str, tag: str):
     token = base64.b64decode(token).decode()
     username, password = token.split(':')
     auth_config = {'username': username, 'password': password}
-    response = docker_client.images.push(
-        repository=ecr_repo_uri,
-        tag=tag,
-        auth_config=auth_config
+    return docker_client.images.push(
+        repository=ecr_repo_uri, tag=tag, auth_config=auth_config
     )
-    return response
 
 
 def generate_manifest(image_name: str, falcon_cid: str, output_file: str):
     "Generate and save manifest for falcon-container injector deployment"
     log.info("Generating manifest from: '%s'" % (image_name))
     resp = docker_client.containers.run(
-        image_name, "--image=" + image_name + " -cid=" + falcon_cid + " -pullpolicy=Always")
+        image_name,
+        f"--image={image_name} -cid={falcon_cid} -pullpolicy=Always",
+    )
+
     manifest = yaml.safe_dump_all(yaml.safe_load_all(resp))
     log.info("Writing manifest file to '%s'" % (output_file))
     f = open(output_file, "w")
@@ -195,7 +194,7 @@ def main():
                                             repo_uri=repo_uri)
 
     tag = import_result[1]
-    image_name = repo_uri + ":" + tag
+    image_name = f"{repo_uri}:{tag}"
 
     # Push sensor image to ECR and log response
     push_response = push_image_ecr(ecr_repo_uri=repo_uri,

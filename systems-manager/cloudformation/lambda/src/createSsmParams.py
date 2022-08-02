@@ -50,24 +50,20 @@ ssm_client = boto3.client('ssm', region_name=REGION)
 
 def get_auth_header(auth_token) -> dict:
     if auth_token:
-        auth_header = "Bearer " + auth_token
-        headers = {
-            "Authorization": auth_header
-        }
-        return headers
+        auth_header = f"Bearer {auth_token}"
+        return {"Authorization": auth_header}
 
 
 def get_auth_token(falcon_client_secret, falcon_client_id):
     url = "https://api.crowdstrike.com/oauth2/token"
-    payload = 'client_secret=' + falcon_client_secret + '&client_id=' + falcon_client_id
+    payload = f'client_secret={falcon_client_secret}&client_id={falcon_client_id}'
     headers = {
         'Content-Type': 'application/x-www-form-urlencoded'
     }
     response = requests.request("POST", url, headers=headers, data=payload)
     if response.ok:
         response_object = (response.json())
-        token = response_object.get('access_token', '')
-        if token:
+        if token := response_object.get('access_token', ''):
             return \
                 token
     return
@@ -91,36 +87,36 @@ def check_for_install_token(credentials) -> bool:
     headers = {
         'Content-Type': 'application/json',
     }
-    headers.update(auth_header)
+    headers |= auth_header
 
     try:
         response = requests.request('GET', url, headers=headers)
         response_content = json.loads(response.text)
         good_exit = 200
         if response.status_code == good_exit:
-            # Tokens are listed in response[]
             if len(response_content['resources']) > 0:
                 return True
-            else:
-                logger.info('No installation valid installation tokens found')
-                return False
+            logger.info('No installation valid installation tokens found')
+            return False
     except Exception as e:
-        logger.info('Got exception {}'.format(e))
+        logger.info(f'Got exception {e}')
         return False
 
 
 def create_installation_token(credentials, label='aws-ssm-token1', valid_days=365) -> bool:
     now = datetime.datetime.now()
     valid_until = (now + datetime.timedelta(valid_days))
-    expiry_date = str(valid_until.isoformat() + 'Z')
+    expiry_date = str(f'{valid_until.isoformat()}Z')
     PARAMS = {
         "expires_timestamp": expiry_date,
         "label": label
     }
 
     url = "https://api.crowdstrike.com/installation-tokens/entities/tokens/v1"
-    auth_token = get_auth_token(credentials['CS_API_GATEWAY_CLIENT_ID'], credentials['CS_API_GATEWAY_CLIENT_SECRET'])
-    if auth_token:
+    if auth_token := get_auth_token(
+        credentials['CS_API_GATEWAY_CLIENT_ID'],
+        credentials['CS_API_GATEWAY_CLIENT_SECRET'],
+    ):
         auth_header = get_auth_header(auth_token)
     else:
         print("Failed to auth token")
@@ -128,7 +124,7 @@ def create_installation_token(credentials, label='aws-ssm-token1', valid_days=36
     headers = {
         'Content-Type': 'application/json',
     }
-    headers.update(auth_header)
+    headers |= auth_header
 
     try:
         response = requests.post(url, headers=headers, json=PARAMS)
@@ -141,7 +137,7 @@ def create_installation_token(credentials, label='aws-ssm-token1', valid_days=36
             logger.info('Failed to generate install token')
             return False
     except Exception as e:
-        logger.info('Got exception {} creating installation token'.format(e))
+        logger.info(f'Got exception {e} creating installation token')
         return False
 
 
@@ -153,28 +149,27 @@ def create_ssm_param(parameter_name, parameter_description, parameter_value, par
         Type=parameter_type,
         Overwrite=overwrite,
     )
-    if response['ResponseMetadata']['HTTPStatusCode'] == 200:
-        return True
-    else:
-        return False
+    return response['ResponseMetadata']['HTTPStatusCode'] == 200
 
 
 def delete_ssm_param(parameter_name):
     response = ssm_client.delete_parameter(
         Name=parameter_name
     )
-    if response['ResponseMetadata']['HTTPStatusCode'] == 200:
-        return True
-    else:
-        return False
+    return response['ResponseMetadata']['HTTPStatusCode'] == 200
 
 
 def cfnresponse_send(event, context, response_status, physical_resource_id=None):
     responseUrl = event['ResponseURL']
-    responseBody = {'Status': response_status,
-                    'Reason': 'See the details in CloudWatch Log Stream: ' + context.log_stream_name,
-                    'PhysicalResourceId': physical_resource_id or context.log_stream_name, 'StackId': event['StackId'],
-                    'RequestId': event['RequestId'], 'LogicalResourceId': event['LogicalResourceId']}
+    responseBody = {
+        'Status': response_status,
+        'Reason': f'See the details in CloudWatch Log Stream: {context.log_stream_name}',
+        'PhysicalResourceId': physical_resource_id or context.log_stream_name,
+        'StackId': event['StackId'],
+        'RequestId': event['RequestId'],
+        'LogicalResourceId': event['LogicalResourceId'],
+    }
+
 
     json_responseBody = json.dumps(responseBody)
 
@@ -192,18 +187,18 @@ def cfnresponse_send(event, context, response_status, physical_resource_id=None)
         #                         data=json_responseBody,
         #                         headers=headers)
         # logger.info('Sending CFN response status: {}'.format(responseStatus))
-        logger.info('Got CFN response status: {}'.format(response.reason))
+        logger.info(f'Got CFN response status: {response.reason}')
     except Exception as e:
-        logger.info('Error sending CFN response {}'.format(e))
+        logger.info(f'Error sending CFN response {e}')
 
 
 def create_params(params, overwrite_action):
     for k, v in params.items():
         try:
-            logger.info('Creating parameter {}'.format(k))
+            logger.info(f'Creating parameter {k}')
             create_ssm_param(k, 'CrowdStrike API', v, 'SecureString', overwrite_action)
         except Exception as e:
-            logger.info('Got Exception creating parameters.  \nException is {}'.format(e))
+            logger.info(f'Got Exception creating parameters.  \nException is {e}')
             return False
     return True
 
@@ -211,21 +206,21 @@ def create_params(params, overwrite_action):
 def delete_params(params):
     for k, v in params.items():
         try:
-            logger.info('Deleting parameter {}'.format(k))
+            logger.info(f'Deleting parameter {k}')
             delete_ssm_param(k)
         except Exception as e:
-            logger.info('Got Exception deleting parameters.  \nException is {}'.format(e))
+            logger.info(f'Got Exception deleting parameters.  \nException is {e}')
     return True
 
 
 def lambda_handler(event, context):
     try:
         response_data = {}
-        logger.info('Event = {}'.format(event))
+        logger.info(f'Event = {event}')
         original_params = event['ResourceProperties']
         params = {key: val for key, val in original_params.items() if key != 'ServiceToken'}
 
-        logger.info('Parameter are {}'.format(params))
+        logger.info(f'Parameter are {params}')
         if check_for_install_token(params):
             logger.info('Valid installation token exists in CrowdStrike Console')
         else:

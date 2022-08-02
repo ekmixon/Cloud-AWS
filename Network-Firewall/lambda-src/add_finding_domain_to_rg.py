@@ -22,7 +22,7 @@ class CredVault():
         try:
 
             ssm = boto3.client('ssm', region_name=self.region)
-            self.logger.debug('Got ssm Client {}'.format(ssm))
+            self.logger.debug(f'Got ssm Client {ssm}')
             # Get the requested parameter
             response = ssm.get_parameters(
                 Names=[
@@ -30,28 +30,25 @@ class CredVault():
                 ],
                 WithDecryption=True
             )
-            self.logger.debug('Got response to get params {}'.format(response))
+            self.logger.debug(f'Got response to get params {response}')
         except Exception as e:
-            self.logger.debug('Got exception to get params {}'.format(e))
+            self.logger.debug(f'Got exception to get params {e}')
 
-        # Store the credentials in a variable
-        credentials = response['Parameters'][0]['Value']
-        return credentials
+        return response['Parameters'][0]['Value']
 
     def get(self):
         try:
             self.falcon_client_id = self._getParameter("FIG_FALCON_CLIENT_ID")
             self.falcon_client_secret = self._getParameter("FIG_FALCON_CLIENT_SECRET")
-            self.logger.debug('self.falcon_client_id {}'.format(self.falcon_client_secret))
-            result = {
-                'falcon_client_id': str(self.falcon_client_id),
-                'falcon_client_secret': str(self.falcon_client_secret)
-            }
+            self.logger.debug(f'self.falcon_client_id {self.falcon_client_secret}')
             # result = json.dumps(self, default=lambda o: o.__dict__, sort_keys=True)
             # # return json.dumps(return)
             # self.logger.debug('return {}'.format(result))
-            return result
+            return {
+                'falcon_client_id': str(self.falcon_client_id),
+                'falcon_client_secret': str(self.falcon_client_secret),
+            }
+
 
         except Exception as e:
-            self.logger.debug('Got exception to get params {}'.format(e))
-            pass
+            self.logger.debug(f'Got exception to get params {e}')

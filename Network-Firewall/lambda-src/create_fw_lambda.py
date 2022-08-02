@@ -67,13 +67,12 @@ def create_stateful_rule_group(rg_name: str, description: str, rules_string: str
             ],
             DryRun=dry_run
         )
-        if response['ResponseMetadata']['HTTPStatusCode'] == 200:
-            logger.debug('Got response tp create_stateful_rule_group {}'.format(response))
-            return response['RuleGroupResponse']
-        else:
+        if response['ResponseMetadata']['HTTPStatusCode'] != 200:
             return
+        logger.debug(f'Got response tp create_stateful_rule_group {response}')
+        return response['RuleGroupResponse']
     except Exception as e:
-        logger.info('Exception calling create_rule_group {}'.format(e))
+        logger.info(f'Exception calling create_rule_group {e}')
         sys.exit(1)
 
 
@@ -81,10 +80,9 @@ def read_file_from_s3(file_name, bucket_name):
     try:
         s3 = boto3.resource('s3')
         obj = s3.Object(bucket_name, file_name)
-        body = obj.get()['Body'].read()
-        return body
+        return obj.get()['Body'].read()
     except Exception as e:
-        logger.info('Exception calling read_file {}'.format(e))
+        logger.info(f'Exception calling read_file {e}')
 
 
 def create_stateless_ipfilter_rulegroup(rg_name: str, description: str, rg_dict: dict, dry_run: bool = False):
@@ -102,13 +100,12 @@ def create_stateless_ipfilter_rulegroup(rg_name: str, description: str, rg_dict:
                 },
             ],
             DryRun=dry_run)
-        if result['ResponseMetadata']['HTTPStatusCode'] == 200:
-            logger.debug('Got response tp create_stateless_filter {}'.format(result))
-            return result['RuleGroupResponse']
-        else:
+        if result['ResponseMetadata']['HTTPStatusCode'] != 200:
             return
+        logger.debug(f'Got response tp create_stateless_filter {result}')
+        return result['RuleGroupResponse']
     except Exception as e:
-        logger.info('Exception calling create_stateless_ipfilter_rulegroup {}'.format(e))
+        logger.info(f'Exception calling create_stateless_ipfilter_rulegroup {e}')
         sys.exit(1)
 
 
@@ -118,16 +115,15 @@ def describe_rule_group_by_name(rg_name: str, type: str):
             RuleGroupName=rg_name,
             # RuleGroupArn=rg_arn,
             Type=type)
-        if result['ResponseMetadata']['HTTPStatusCode'] == 200:
-            logger.debug('Got response tp create describe_rule_group {}'.format(result))
-            return result
-        else:
+        if result['ResponseMetadata']['HTTPStatusCode'] != 200:
             return
+        logger.debug(f'Got response tp create describe_rule_group {result}')
+        return result
     except vpcfw_client.exceptions.ResourceNotFoundException:
-        logger.info('Resource group {} not found'.format(rg_name))
+        logger.info(f'Resource group {rg_name} not found')
         return
     except Exception as e:
-        logger.info('Exception calling describe_rule_group {}'.format(e))
+        logger.info(f'Exception calling describe_rule_group {e}')
         sys.exit(1)
 
 
@@ -148,13 +144,12 @@ def create_domain_filter_rule_group(rg_name: str, targets: list, action: str) ->
     try:
         result = vpcfw_client.create_rule_group(RuleGroupName=rg_name, RuleGroup=rulegroup, Capacity=1000,
                                                 Type='STATEFUL')
-        if result['ResponseMetadata']['HTTPStatusCode'] == 200:
-            logger.debug('Got create rule group response {}'.format(result))
-            return result['RuleGroupResponse']
-        else:
+        if result['ResponseMetadata']['HTTPStatusCode'] != 200:
             return
+        logger.debug(f'Got create rule group response {result}')
+        return result['RuleGroupResponse']
     except Exception as e:
-        logger.info('Exception calling create_domain_filter {}'.format(e))
+        logger.info(f'Exception calling create_domain_filter {e}')
         sys.exit(1)
 
 
@@ -167,12 +162,11 @@ def check_rg_status(rule_group_list):
 
 def create_fw_policy(policy_name: str, stateless_rg_ref, stateful_rg_arns, stateless_action: str,
                      description: str, dry_run: bool = False):
-    stateful_ruleGroup_references = []
-    for arn in stateful_rg_arns:
-        stateful_ruleGroup_references.append({
-            "ResourceArn": arn
-        })
-    logger.info('RuleGroupArns {}'.format(stateful_ruleGroup_references))
+    stateful_ruleGroup_references = [
+        {"ResourceArn": arn} for arn in stateful_rg_arns
+    ]
+
+    logger.info(f'RuleGroupArns {stateful_ruleGroup_references}')
     try:
 
         result = vpcfw_client.create_firewall_policy(
@@ -193,23 +187,29 @@ def create_fw_policy(policy_name: str, stateless_rg_ref, stateful_rg_arns, state
             Description=description,
             DryRun=dry_run
         )
-        logger.debug('Got create_fw_policy response {}'.format(result))
+        logger.debug(f'Got create_fw_policy response {result}')
         return result
 
     except Exception as e:
-        logger.info('Got Exception {} creating firewall policy'.format(e))
+        logger.info(f'Got Exception {e} creating firewall policy')
 
 
 def cfnresponse_send(event, context, responseStatus, responseData, physicalResourceId=None, noEcho=False):
     responseUrl = event['ResponseURL']
-    logger.info('Got response {} {} {} {}'.format(event, context, responseStatus, responseData))
+    logger.info(f'Got response {event} {context} {responseStatus} {responseData}')
     print(responseUrl)
 
-    responseBody = {'Status': responseStatus,
-                    'Reason': 'See the details in CloudWatch Log Stream: ' + context.log_stream_name,
-                    'PhysicalResourceId': physicalResourceId or context.log_stream_name, 'StackId': event['StackId'],
-                    'RequestId': event['RequestId'], 'LogicalResourceId': event['LogicalResourceId'], 'NoEcho': noEcho,
-                    'Data': responseData}
+    responseBody = {
+        'Status': responseStatus,
+        'Reason': f'See the details in CloudWatch Log Stream: {context.log_stream_name}',
+        'PhysicalResourceId': physicalResourceId or context.log_stream_name,
+        'StackId': event['StackId'],
+        'RequestId': event['RequestId'],
+        'LogicalResourceId': event['LogicalResourceId'],
+        'NoEcho': noEcho,
+        'Data': responseData,
+    }
+
 
     json_responseBody = json.dumps(responseBody)
 
@@ -223,9 +223,9 @@ def cfnresponse_send(event, context, responseStatus, responseData, physicalResou
         response = requests.put(responseUrl,
                                 data=json_responseBody,
                                 headers=headers)
-        logger.debug('cfn response {}'.format(response))
+        logger.debug(f'cfn response {response}')
     except Exception as e:
-        logger.info('Exception calling cfnresponse {}'.format(e))
+        logger.info(f'Exception calling cfnresponse {e}')
 
 
 def create_fw(name: str, fw_policy_arn: str, subnet_mapping: list, vpc_id: str, description: str,
@@ -245,11 +245,11 @@ def create_fw(name: str, fw_policy_arn: str, subnet_mapping: list, vpc_id: str, 
                 },
             ]
         )
-        logger.debug('Got response to create_fw {}'.format(response))
+        logger.debug(f'Got response to create_fw {response}')
         return response
 
     except Exception as e:
-        logger.info('Got Exception creating firewall {}'.format(e))
+        logger.info(f'Got Exception creating firewall {e}')
 
 
 def describe_firewall(fw_name):
@@ -258,13 +258,12 @@ def describe_firewall(fw_name):
             FirewallName=fw_name,
             # FirewallArn = fw_policy_arn
         )
-        if response['ResponseMetadata']['HTTPStatusCode'] == 200:
-            logger.debug('Got response to describe_firewall {}'.format(response))
-            return response
-        else:
+        if response['ResponseMetadata']['HTTPStatusCode'] != 200:
             return
+        logger.debug(f'Got response to describe_firewall {response}')
+        return response
     except Exception as e:
-        logger.info('Got Exception creating firewall {}'.format(e))
+        logger.info(f'Got Exception creating firewall {e}')
 
 
 def get_fw_nic(subnet_id):
@@ -275,14 +274,14 @@ def get_fw_nic(subnet_id):
 
 def delete_net_fw_route(route_table_id, destination_cidr_block):
     try:
-        response = ec2_client.delete_route(
+        return ec2_client.delete_route(
             DryRun=False,
             RouteTableId=route_table_id,
             DestinationCidrBlock=destination_cidr_block,
         )
-        return response
+
     except Exception as e:
-        logger.info('Got Exception adding route {}'.format(e))
+        logger.info(f'Got Exception adding route {e}')
 
 
 def add_route_net_fw_nh(route_table_id, destination_cidr_block, vpce_id):
@@ -295,15 +294,15 @@ def add_route_net_fw_nh(route_table_id, destination_cidr_block, vpce_id):
     """
 
     try:
-        response = ec2_client.create_route(
+        return ec2_client.create_route(
             DryRun=False,
             RouteTableId=route_table_id,
             DestinationCidrBlock=destination_cidr_block,
-            VpcEndpointId=vpce_id
+            VpcEndpointId=vpce_id,
         )
-        return response
+
     except Exception as e:
-        logger.info('Got Exception adding route {}'.format(e))
+        logger.info(f'Got Exception adding route {e}')
 
 
 def delete_firewall(fw_name):
@@ -311,30 +310,25 @@ def delete_firewall(fw_name):
         response = vpcfw_client.delete_firewall(
             FirewallName=fw_name
         )
-        logger.info('Got response to delete_firewall {}'.format(response))
+        logger.info(f'Got response to delete_firewall {response}')
         if response['ResponseMetadata']['HTTPStatusCode'] == 200:
             return response
         else:
             return
     except Exception as e:
-        logger.info('Got Exception deleting fw {}'.format(e))
+        logger.info(f'Got Exception deleting fw {e}')
         return
 
 
 def get_eni_attachment_id(fw_subnet_id):
     try:
-        interfaces_dict = ec2_client.describe_network_interfaces(
+        return ec2_client.describe_network_interfaces(
             Filters=[
-                {
-                    'Name': 'subnet-id',
-                    'Values': [fw_subnet_id]
-                },
-                {
-                    'Name': 'attachment.device-index',
-                    'Values': ['0']
-                }]
+                {'Name': 'subnet-id', 'Values': [fw_subnet_id]},
+                {'Name': 'attachment.device-index', 'Values': ['0']},
+            ]
         )
-        return interfaces_dict
+
     except:
         logger.info('Could not find firewall nic')
         return
@@ -352,14 +346,14 @@ def delete_firewall_policy(fw_name):
     try:
         response = vpcfw_client.delete_firewall_policy(
             FirewallPolicyName=fw_name)
-        logger.info('Got response to delete_firewall_policy {}'.format(response))
+        logger.info(f'Got response to delete_firewall_policy {response}')
         if response['ResponseMetadata']['HTTPStatusCode'] == 200:
 
             return response
         else:
             return
     except vpcfw_client.exceptions.ResourceNotFoundException:
-        print('Resource group {} not found'.format(fw_name))
+        print(f'Resource group {fw_name} not found')
         return
 
 
@@ -368,16 +362,15 @@ def delete_fw_rule_group(rg_name: str, type: str) -> dict:
         result = vpcfw_client.delete_rule_group(
             RuleGroupName=rg_name,
             Type=type)
-        if result['ResponseMetadata']['HTTPStatusCode'] == 200:
-            logger.info('Got response to delete_fw_rule_group {}'.format(result))
-            return result
-        else:
+        if result['ResponseMetadata']['HTTPStatusCode'] != 200:
             return
+        logger.info(f'Got response to delete_fw_rule_group {result}')
+        return result
     except vpcfw_client.exceptions.ResourceNotFoundException as error:
-        logger.info('Rule group {} not found'.format(rg_name))
+        logger.info(f'Rule group {rg_name} not found')
         return
     except Exception as e:
-        logger.info('Got exception calling delete_fw_rule_group {}'.format(e))
+        logger.info(f'Got exception calling delete_fw_rule_group {e}')
 
 
 def check_fw_ready(fw_name):
@@ -400,7 +393,7 @@ def get_fw_vpce_by_az(fw_name):
     '''
 
     fw = vpcfw_client.describe_firewall(FirewallName=fw_name)
-    logger.info('fw data {}'.format(fw))
+    logger.info(f'fw data {fw}')
     attachment_data = []
 
     try:
@@ -410,20 +403,19 @@ def get_fw_vpce_by_az(fw_name):
             new_dict = {k: fw_attachments[k]['Attachment']['EndpointId']}
             attachment_data.append({k: fw_attachments[k]['Attachment']['EndpointId']})
 
-        logger.info('attachment data {}'.format(attachment_data))
+        logger.info(f'attachment data {attachment_data}')
         return attachment_data
     except Exception as e:
-        logger.info('Got exception checking attachments {}'.format(e))
+        logger.info(f'Got exception checking attachments {e}')
 
 
 def check_firewall_exists(fw_name):
     try:
-        fw_list = vpcfw_client.list_firewalls()
-        if fw_list:
+        if fw_list := vpcfw_client.list_firewalls():
             for fw in fw_list['Firewalls']:
-                logger.info('Checking list entry {}'.format(fw))
+                logger.info(f'Checking list entry {fw}')
                 if fw['FirewallName'] == fw_name:
-                    logger.info('Found firewall {}'.format(fw['FirewallName']))
+                    logger.info(f"Found firewall {fw['FirewallName']}")
                     return True
 
             logger.info('Firewall not found')
@@ -441,10 +433,10 @@ def lambda_handler(event, context):
         stateless_rules = json.loads((read_file_from_s3(STATELESS_RG_FILENAME, s3_bucket).decode("utf-8")))
         stateless_rg = create_stateless_ipfilter_rulegroup(fw_stateless_rg_name, STATELESS_RG_DESC, stateless_rules)
         stateless_rg_arn = stateless_rg['RuleGroupArn']
-        logger.info('Stateless RG ARN {}'.format(stateless_rg_arn))
+        logger.info(f'Stateless RG ARN {stateless_rg_arn}')
         domain_rg = create_domain_filter_rule_group(fw_domain_rg_name, filtered_domains, 'DENYLIST')
         domain_rg_arn = domain_rg['RuleGroupArn']
-        logger.info('Domain RG ARN {}'.format(domain_rg_arn))
+        logger.info(f'Domain RG ARN {domain_rg_arn}')
         # stateful_rules = read_file_from_s3(STATEFUL_TCP_RG_FILENAME, s3_bucket).decode("utf-8")
         # stateful_rg = create_stateful_rule_group(fw_stateful_rg_name, STATEFUL_TCP_RG_DESC, stateful_rules,
         #                                          dry_run=False)
@@ -464,10 +456,10 @@ def lambda_handler(event, context):
         time.sleep(45)
         if check_fw_ready(fw_name):
             fw_attachments = get_fw_vpce_by_az(fw_name)
-            logger.info('FW attachments {}'.format(fw_attachments))
+            logger.info(f'FW attachments {fw_attachments}')
 
         subnet_info = ec2_client.describe_subnets(SubnetIds=[fw_subnet_id])
-        logger.info('subnet info {}'.format(subnet_info))
+        logger.info(f'subnet info {subnet_info}')
         az = subnet_info['Subnets'][0]['AvailabilityZone']
         for attachment in fw_attachments:
             if az in attachment:
@@ -494,13 +486,9 @@ def lambda_handler(event, context):
         delete_net_fw_route(route_table_id, DESTINATION_CIDR_BLOCK)
         delete_net_fw_route(gw_route_table_id, private_subnet_cidr)
         if delete_firewall(fw_name):
-            while True:
-                if check_firewall_exists(fw_name):
-                    time.sleep(10)
-                    logger.info('Sleeping waiting for firewall to delete')
-                    continue
-                else:
-                    break
+            while check_firewall_exists(fw_name):
+                time.sleep(10)
+                logger.info('Sleeping waiting for firewall to delete')
             # Additional wait while policy lock is released
             time.sleep(30)
             if delete_firewall_policy(fw_policy_name):

@@ -20,16 +20,18 @@ def handleRecord(decoded_line):
         for tag in instance.tags:
             if "name" in tag["Key"].lower():
                 decoded_line["instance_name"] = tag["Value"]
-    logger.debug('Sending to security hub {}'.format(decoded_line))
-    send_result = sendToSecurityHub(generateManifest(decoded_line, region), region)
-    return send_result
+    logger.debug(f'Sending to security hub {decoded_line}')
+    return sendToSecurityHub(generateManifest(decoded_line, region), region)
 
 
 def generateManifest(detection_event, region):
     manifest = {}
     try:
         manifest["SchemaVersion"] = "2018-10-08"
-        manifest["ProductArn"] = "arn:aws:securityhub:%s:517716713836:product/crowdstrike/crowdstrike-falcon" % region
+        manifest[
+            "ProductArn"
+        ] = f"arn:aws:securityhub:{region}:517716713836:product/crowdstrike/crowdstrike-falcon"
+
         manifest["AwsAccountId"] = detection_event["service_provider_account_id"]
         manifest["Id"] = detection_event["instance_id"] + detection_event["detection_id"]
         manifest["GeneratorId"] = detection_event["generator_id"]
@@ -40,7 +42,7 @@ def generateManifest(detection_event, region):
         severityProduct = detection_event["severity"]
         severityNormalized = severityProduct * 20
         manifest["Severity"] = {"Product": severityProduct, "Normalized": severityNormalized}
-        manifest["Title"] = "Falcon Alert. Instance: %s" % detection_event["instance_id"]
+        manifest["Title"] = f'Falcon Alert. Instance: {detection_event["instance_id"]}'
         manifest["Description"] = detection_event["description"]
         manifest["SourceUrl"] = detection_event["source_url"]
         manifest["Resources"] = [{"Type": "AwsEc2Instance", "Id": detection_event["instance_id"], "Region": region}]
@@ -48,8 +50,12 @@ def generateManifest(detection_event, region):
         print("Could not translate info for event %s\n%s" % (detection_event["detection_id"], traceback.format_exc()))
         return
     try:
-        manifest["Types"] = ["Namespace: TTPs", "Category: %s" % detection_event["tactic"],
-                             "Classifier: %s" % detection_event["technique"]]
+        manifest["Types"] = [
+            "Namespace: TTPs",
+            f'Category: {detection_event["tactic"]}',
+            f'Classifier: {detection_event["technique"]}',
+        ]
+
     except:
         pass
     if "Process" in detection_event:
@@ -78,13 +84,13 @@ def getInstance(instance_id):
             checkId = ec2instance.vpc_id
             break
         except ClientError as err:
-            logger.debug('Got error  {}'.format(err))
+            logger.debug(f'Got error  {err}')
             # This is the wrong region for this instance
             continue
         except:
             # Something untoward has occurred, throw the error in the log
             tb = traceback.format_exc()
-            logger.debug('Got error sending to security hub {}'.format(tb))
+            logger.debug(f'Got error sending to security hub {tb}')
             continue
 
     return region, ec2instance
@@ -97,10 +103,10 @@ def sendToSecurityHub(manifest, region):
         import_response = client.batch_import_findings(Findings=[manifest])
     except ClientError as err:
         # Boto3 issue communicating with SH, throw the error in the log
-        logger.debug('Got error sending to security hub {}'.format(err))
+        logger.debug(f'Got error sending to security hub {err}')
     except:
         # Unknown error / issue, log the result
         tb = traceback.format_exc()
-        logger.debug('Got error sending to security hub {}'.format(tb))
+        logger.debug(f'Got error sending to security hub {tb}')
 
     return import_response

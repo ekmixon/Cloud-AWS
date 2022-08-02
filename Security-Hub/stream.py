@@ -21,10 +21,8 @@ class Stream():  # pylint: disable=R0902
         self.token_expiration = stream_config["sessionToken"]["expiration"]
         self.refresh_url = stream_config["refreshActiveSessionURL"]
         self.refresh_interval = stream_config["refreshActiveSessionInterval"]
-        # Calculate our base URL
-        result = re.match("^(http://|https://)([^#?/]+)", self.refresh_url)
-        if result:
-            self.base_url = result.group(0)
+        if result := re.match("^(http://|https://)([^#?/]+)", self.refresh_url):
+            self.base_url = result[0]
         else:
             # Fallback to commercial if we can't calculate it
             self.base_url = "https://api.crowdstrike.com"
@@ -59,11 +57,14 @@ class Stream():  # pylint: disable=R0902
         self.offset = self.logger.offset_read(self.offset_file)
         # Find our old position in the stream
         if self.offset > 0:
-            self.data_feed = self.data_feed + f"&offset={str(self.offset)}"
+            self.data_feed = f"{self.data_feed}&offset={str(self.offset)}"
         # Our active spout
         self.spigot = False
         # Token reporting lambdas
-        self.token_expired = bool(int(time.time()) > ((int(self.refresh_interval)-60)+self.epoch))
+        self.token_expired = (
+            int(time.time()) > (int(self.refresh_interval) - 60) + self.epoch
+        )
+
         self.token_remains = lambda: ((int(self.refresh_interval)-60)+self.epoch)-int(time.time())
         # Thread running flag
         self.running = True
@@ -115,11 +116,10 @@ class Stream():  # pylint: disable=R0902
         })
         refreshed = False
 
-        if "status_code" in refresher:
-            if refresher["status_code"] == 200:
-                refreshed = True
-                self.epoch = int(time.time())
-                self.logger.status_write("Token refreshed.")
+        if "status_code" in refresher and refresher["status_code"] == 200:
+            refreshed = True
+            self.epoch = int(time.time())
+            self.logger.status_write("Token refreshed.")
 
         return refreshed
 
@@ -128,7 +128,8 @@ class Stream():  # pylint: disable=R0902
         """Create our SQS payload."""
         utc = datetime.datetime.utcfromtimestamp
         create_time = utc(float(decoded_line['metadata']['eventCreationTime'])/1000.).isoformat()+'Z'
-        update_time = (utc(datetime.datetime.timestamp(datetime.datetime.now()))).isoformat()+'Z'
+        update_time = f'{(utc(datetime.datetime.timestamp(datetime.datetime.now()))).isoformat()}Z'
+
         payload = {
             "hostname": resource_detail["hostname"],
             "detected_mac_address": decoded_line["event"]["MACAddress"],
@@ -201,18 +202,17 @@ class Stream():  # pylint: disable=R0902
         for resource_detail in host_lookup["body"]["resources"]:
             reviewed += 1
             if self.api_config["confirm_provider"]:
-                if "service_provider" in resource_detail:
-                    if resource_detail["service_provider"] == "AWS_EC2":
-                        decoded_mac, resource_mac = self.get_compare_values(decode, resource_detail)
-                        if decoded_mac == resource_mac:
-                            payload = self.create_payload(resource_detail, decode)
-                            # Hit
-                            self.detections += 1
-                    else:
-                        # Miss - not in AWS
-                        self.discarded += 1
+                if (
+                    "service_provider" in resource_detail
+                    and resource_detail["service_provider"] == "AWS_EC2"
+                ):
+                    decoded_mac, resource_mac = self.get_compare_values(decode, resource_detail)
+                    if decoded_mac == resource_mac:
+                        payload = self.create_payload(resource_detail, decode)
+                        # Hit
+                        self.detections += 1
                 else:
-                    # Miss - no svc provider
+                    # Miss - not in AWS
                     self.discarded += 1
             else:
                 decoded_mac, resource_mac = self.get_compare_values(decode, resource_detail)
@@ -294,9 +294,6 @@ class Stream():  # pylint: disable=R0902
                 else:
                     continue
                 break
-        else:
-            pass
-
         self.force_quit()
 
         raise SystemExit("Thread terminated")

@@ -16,13 +16,14 @@ def cfnresponse_send(event, context, responseStatus, physicalResourceId=None, no
     responseUrl = event['ResponseURL']
     print(responseUrl)
 
-    responseBody = {}
-    responseBody['Status'] = responseStatus
-    responseBody['Reason'] = 'See the details in CloudWatch Log Stream: ' + context.log_stream_name
-    responseBody['PhysicalResourceId'] = physicalResourceId or context.log_stream_name
-    responseBody['StackId'] = event['StackId']
-    responseBody['RequestId'] = event['RequestId']
-    responseBody['LogicalResourceId'] = event['LogicalResourceId']
+    responseBody = {
+        'Status': responseStatus,
+        'Reason': f'See the details in CloudWatch Log Stream: {context.log_stream_name}',
+        'PhysicalResourceId': physicalResourceId or context.log_stream_name,
+        'StackId': event['StackId'],
+        'RequestId': event['RequestId'],
+        'LogicalResourceId': event['LogicalResourceId'],
+    }
 
     json_responseBody = json.dumps(responseBody)
 
@@ -37,13 +38,13 @@ def cfnresponse_send(event, context, responseStatus, physicalResourceId=None, no
         response = requests.put(responseUrl,
                                 data=json_responseBody,
                                 headers=headers)
-        print("Status code: " + response.reason)
+        print(f"Status code: {response.reason}")
     except Exception as e:
-        print("send(..) failed executing requests.put(..): " + str(e))
+        print(f"send(..) failed executing requests.put(..): {str(e)}")
 
 
 def lambda_handler(event, context):
-    logger.info('Got event {}'.format(event))
+    logger.info(f'Got event {event}')
     try:
         response_data = {}
         if event['RequestType'] in ['Create']:
@@ -67,16 +68,14 @@ def lambda_handler(event, context):
                                        ],
                         },
                     ]})
-            logger.info('Response to bucket notification add {}'.format(response))
+            logger.info(f'Response to bucket notification add {response}')
             if response['ResponseMetadata']['HTTPStatusCode'] == 200:
                 cfnresponse_send(event, context, SUCCESS, "CustomResourcePhysicalID")
             else:
                 cfnresponse_send(event, context, FAILED, "CustomResourcePhysicalID")
-        elif event['RequestType'] in ['Delete']:
-            cfnresponse_send(event, context, SUCCESS, "CustomResourcePhysicalID")
         else:
             cfnresponse_send(event, context, SUCCESS, "CustomResourcePhysicalID")
     except Exception as e:
-        logger.info('Got exception {}'.format(e))
+        logger.info(f'Got exception {e}')
         cfnresponse_send(event, context, FAILED, "CustomResourcePhysicalID")
     return "Created notification"

@@ -26,23 +26,21 @@ def lambda_handler(event, context):
         if "Records" in event:
             # Originated from SQS, loop thru all of the records
             for record in event["Records"]:
-                logger.debug('Processing record {}'.format(record))
+                logger.debug(f'Processing record {record}')
                 if "body" in record:
                     decoded_line = json.loads(record["body"])
                     return_msg = json.dumps(handleRecord(decoded_line))
-        # Process any direct events
         elif "instance_id" in event:
             decoded_line = event
             return_msg = json.dumps(handleRecord(decoded_line))
-        # Ignore all others
         else:
             return_msg = {"message": "No action performed - no instance_id"}
     except Exception as e:
-        logger.debug('Got exception processing message {}'.format(e))
+        logger.debug(f'Got exception processing message {e}')
         return_msg = {"message": "Execution failure"}
 
     # Debug output
-    logger.debug('Return message {}'.format(return_msg))
+    logger.debug(f'Return message {return_msg}')
 
     return {
         'statusCode': 200,

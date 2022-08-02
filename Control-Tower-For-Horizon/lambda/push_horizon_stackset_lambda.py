@@ -23,8 +23,8 @@ def get_secret_value(secret):
 
 
 def lambda_handler(event, context):
-    logger.info('Got event {}'.format(event))
-    logger.info('Context {}'.format(context))
+    logger.info(f'Got event {event}')
+    logger.info(f'Context {context}')
     masterAcct = event['account']
     eventDetails = event['detail']
     regionName = eventDetails['awsRegion']
@@ -48,21 +48,28 @@ def lambda_handler(event, context):
             for s in secretList.keys():
                 keyDict = {'ParameterKey': s, 'ParameterValue': secretList[s]}
                 CRWD_Discover_paramList.append(dict(keyDict))
-            CRWD_Discover_paramList.append({'ParameterKey': 'accountId', 'ParameterValue': accId})
-            CRWD_Discover_paramList.append({'ParameterKey': 'organizationalUnitId', 'ParameterValue': odId})
+            CRWD_Discover_paramList.extend(
+                (
+                    {'ParameterKey': 'accountId', 'ParameterValue': accId},
+                    {
+                        'ParameterKey': 'organizationalUnitId',
+                        'ParameterValue': odId,
+                    },
+                )
+            )
 
             for item in stackset_list:
                 try:
                     # TODO Possible Fetch api keys from secrets store instead of Input parameters in stackset
                     CFT.create_stack_instances(StackSetName=item, Accounts=[accId], Regions=[regionName],
                                                ParameterOverrides=CRWD_Discover_paramList)
-                    logger.info('Processed {} Sucessfully'.format(item))
+                    logger.info(f'Processed {item} Sucessfully')
 
                 except Exception as e:
-                    logger.error('Unable to launch in:{}, REASON: {}'.format(item, e))
+                    logger.error(f'Unable to launch in:{item}, REASON: {e}')
         else:
             '''Unsucessful event recieved'''
-            logger.info('Unsucessful Event Recieved. SKIPPING :{}'.format(event))
+            logger.info(f'Unsucessful Event Recieved. SKIPPING :{event}')
             return (False)
     else:
-        logger.info('Control Tower Event Captured :{}'.format(event))
+        logger.info(f'Control Tower Event Captured :{event}')

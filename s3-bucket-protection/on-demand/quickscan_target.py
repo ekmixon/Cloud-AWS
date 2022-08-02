@@ -65,14 +65,15 @@ class Configuration:  # pylint: disable=R0902
     """Class to hold our running configuration."""
     def __init__(self, args):
         self.log_level = logging.INFO
-        if args.log_level:
-            if args.log_level.upper() in "DEBUG,WARN,ERROR".split(","):
-                if args.log_level.upper() == "DEBUG":
-                    self.log_level = logging.DEBUG
-                elif args.log_level.upper() == "WARN":
-                    self.log_level = logging.WARN
-                elif args.log_level.upper() == "ERROR":
-                    self.log_level = logging.ERROR
+        if args.log_level and args.log_level.upper() in "DEBUG,WARN,ERROR".split(
+            ","
+        ):
+            if args.log_level.upper() == "DEBUG":
+                self.log_level = logging.DEBUG
+            elif args.log_level.upper() == "WARN":
+                self.log_level = logging.WARN
+            elif args.log_level.upper() == "ERROR":
+                self.log_level = logging.ERROR
 
         self.batch = 1000
         if args.batch:
@@ -107,12 +108,11 @@ def submit_scan(incoming_analyzer: Analysis):
         logger.info("Scan %s submitted for analysis", scan_id)
         # Retrieve our scan results from the API and report them
         report_results(scan_uploaded_samples(incoming_analyzer, scan_id), incoming_analyzer)
+    elif "errors" in scanned["body"]:
+        logger.warning("%s. Unable to submit volume for scan.", scanned["body"]["errors"][0]["message"])
     else:
-        if "errors" in scanned["body"]:
-            logger.warning("%s. Unable to submit volume for scan.", scanned["body"]["errors"][0]["message"])
-        else:
-            # Rate limit only
-            logger.warning("Rate limit exceeded.")
+        # Rate limit only
+        logger.warning("Rate limit exceeded.")
     # Clean up our uploaded files from out of the API
     clean_up_artifacts(incoming_analyzer)
 
@@ -193,13 +193,12 @@ def report_results(results: dict, incoming_analyzer: Analysis):
                 if "no specific threat" in result["verdict"]:
                     # File is clean
                     logger.info("Verdict for %s: %s", item[1], result["verdict"])
+                elif "error" in result:
+                    # Unscannable
+                    logger.info("Unscannable file %s: verdict %s", item[1], result["verdict"])
                 else:
-                    if "error" in result:
-                        # Unscannable
-                        logger.info("Unscannable file %s: verdict %s", item[1], result["verdict"])
-                    else:
-                        # Mitigation would trigger from here
-                        logger.warning("Verdict for %s: %s", item[1], result["verdict"])
+                    # Mitigation would trigger from here
+                    logger.warning("Verdict for %s: %s", item[1], result["verdict"])
 
 
 def clean_up_artifacts(incoming_analyzer: Analysis):

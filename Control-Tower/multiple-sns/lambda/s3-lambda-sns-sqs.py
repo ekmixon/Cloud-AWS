@@ -41,8 +41,8 @@ sqs_client = boto3.client('sqs', region_name=runtime_region)
 
 def lambda_handler(event, context):
 
-    logger.debug('Got event {}'.format(event))
-    logger.debug('Got context {}'.format(context))
+    logger.debug(f'Got event {event}')
+    logger.debug(f'Got context {context}')
 
     #
     # First handle event and send PUT requests to CrowdStrike
@@ -57,37 +57,32 @@ def lambda_handler(event, context):
                 TopicArn=CRWD_TOPIC,
                 Message=json.dumps(event),
             )
-            logger.debug('Published to CRWD topic with response {}'.format(response))
+            logger.debug(f'Published to CRWD topic with response {response}')
         except Exception as e:
-            logger.info("Got Error {} publishing to CrowdStrike SNS topic".format(e))
-            pass
-
+            logger.info(f"Got Error {e} publishing to CrowdStrike SNS topic")
     if os.environ.get('sns_topic_arns'):
         sns_topic_arns = os.environ['sns_topic_arns'].split(',')
-        logger.debug('Got Topic ARNS {}'.format(sns_topic_arns))
+        logger.debug(f'Got Topic ARNS {sns_topic_arns}')
         for topic in sns_topic_arns:
             try:
-                logger.debug("Publishing to topic {}".format(topic))
+                logger.debug(f"Publishing to topic {topic}")
                 response = sns_client.publish(
                     TopicArn=topic,
                     Message=json.dumps(event),
                 )
-                logger.debug('Publish response {}'.format(response))
+                logger.debug(f'Publish response {response}')
             except Exception as e:
-                logger.info("Got Error {} publishing to SNS topic {}".format(e, topic))
-                pass
-
+                logger.info(f"Got Error {e} publishing to SNS topic {topic}")
     if os.environ.get('sqs_queue_urls'):
         sqs_queue_urls = os.environ['sqs_queue_urls'].split(',')
-        logger.debug('Got SQS queue {}'.format(sqs_queue_urls))
+        logger.debug(f'Got SQS queue {sqs_queue_urls}')
         for queue_url in sqs_queue_urls:
             try:
-                logger.debug("Publishing to sqs queue {}".format(queue_url))
+                logger.debug(f"Publishing to sqs queue {queue_url}")
                 response = sqs_client.send_message(
                     QueueUrl=queue_url,
                     MessageBody=json.dumps(event),
                 )
-                logger.debug('Publish response {}'.format(response))
+                logger.debug(f'Publish response {response}')
             except Exception as e:
-                logger.info("Got Error {} publishing to SQS queue {}".format(e, queue_url))
-                pass
+                logger.info(f"Got Error {e} publishing to SQS queue {queue_url}")

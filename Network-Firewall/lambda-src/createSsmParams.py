@@ -38,10 +38,7 @@ def delete_ssm_params(parameter_names):
         response = ssm_client.delete_parameters(
             Names=parameter_names
         )
-        if response['ResponseMetadata']['HTTPStatusCode'] == 200:
-            return True
-        else:
-            return False
+        return response['ResponseMetadata']['HTTPStatusCode'] == 200
     except:
         logger.error("Unidentified error")
 
@@ -55,10 +52,7 @@ def create_ssm_param(parameter_name, parameter_description, parameter_value, par
             Type=parameter_type,
             Overwrite=overwrite,
         )
-        if response['ResponseMetadata']['HTTPStatusCode'] == 200:
-            return True
-        else:
-            return False
+        return response['ResponseMetadata']['HTTPStatusCode'] == 200
     except ClientError as err:
         if err.response['Error']['Code'] == "ParameterAlreadyExists":
             logger.error("Parameter already exists")
@@ -82,10 +76,8 @@ def lambda_handler(event, context):
             cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
         elif event['RequestType'] == 'Delete':
             if "ResourceProperties" in event:
-                parameter_list = []
                 keys = event["ResourceProperties"]
-                for key in keys:
-                    parameter_list.append(key)
+                parameter_list = list(keys)
                 delete_ssm_params(parameter_list)
             cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
     except Exception as e:

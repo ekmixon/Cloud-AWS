@@ -65,7 +65,7 @@ def docker_login(username, password):
     try:
         res = docker_client.login(username=username, password=password,
                                   registry='https://registry.crowdstrike.com')
-        success = bool(res['Status'] == 'Login Succeeded')
+        success = res['Status'] == 'Login Succeeded'
 
     except Exception as err:
         graceful_failure(f'Error {err}', no_log=True)
@@ -85,11 +85,7 @@ def get_image_pull_token():
     except IOError:
         log.info('Unable to open docker config file %s', docker_config_file_path)
     base64_bytes = base64.b64encode(config_file_bytes)
-    # Use dedicated config file
-    # base64_bytes = base64.b64encode(json.dumps(auth_config).encode('utf-8'))
-    token = base64_bytes.decode('ascii')
-
-    return token
+    return base64_bytes.decode('ascii')
 
 
 def generate_manifest(image_name: str, cid: str, output_file: str):
@@ -100,9 +96,23 @@ def generate_manifest(image_name: str, cid: str, output_file: str):
     image_pull_token = get_image_pull_token()
 
     try:
-        resp = docker_client.containers.run(image_name,
-                                            "-image=" + image_name + " -pulltoken=" + image_pull_token
-                                            + " -namespaces=" + NAMESPACES + " -cid=" + cid)
+        resp = docker_client.containers.run(
+            image_name,
+            (
+                (
+                    (
+                        (
+                            f"-image={image_name} -pulltoken={image_pull_token}"
+                            + " -namespaces="
+                        )
+                        + NAMESPACES
+                    )
+                    + " -cid="
+                )
+                + cid
+            ),
+        )
+
         manifest = yaml.safe_dump_all(yaml.safe_load_all(resp))
         log.info("Writing manifest file to '%s'", output_file)
         with open(output_file, "w+") as file_handle:
@@ -122,7 +132,7 @@ def deploy_manifest(yaml_file):
         resp = k8s_utils.create_from_yaml(k8s, yaml_file)
         log.info(resp)
     except Exception as err:
-        graceful_failure('Error {} deploying manifest'.format(err))
+        graceful_failure(f'Error {err} deploying manifest')
 
 
 def main():

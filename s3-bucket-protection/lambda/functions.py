@@ -56,6 +56,6 @@ def send_to_security_hub(manifest, region):
             import_response = client.batch_import_findings(Findings=[manifest])
         except (ClientError, EndpointConnectionError) as err:
             # Boto3 issue communicating with SH, throw the error in the log
-            print(str(err))
+            print(err)
 
     return import_response

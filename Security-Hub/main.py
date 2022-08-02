@@ -174,27 +174,23 @@ if "confirm_provider" not in config:
     config["confirm_provider"] = True
 # Ask for a list of available streams
 new_streams = falcon.command(action="listAvailableStreamsOAuth2", appId=config["app_id"])
-if "resources" in new_streams["body"]:
-    if new_streams["body"]["resources"]:
-        # Retrieve the SQS queue we'll use for notifications
-        try:
-            queue = boto3.resource('sqs', region_name=config["region"]).get_queue_by_name(QueueName=config["sqs_queue_name"])
-        except ClientError:
-            status.status_write("Unable to retrieve specified SQS queue")
-        except EndpointConnectionError:
-            status.status_write("Invalid region specified")
-        else:
-            start_streaming(new_streams["body"]["resources"], current_cid)
-            # Only sleep if we have threads opened
-            while threading.active_count() > 0:
-                status.status_write("All threads started, main process sleeping.")
-                # Force a wake up / restart of all streams
-                time.sleep(21600)
-                status.status_write("Restarting service and refreshing all streams.")
-                # Discard all objects and restart the main service thread
-                os.execv(sys.executable, [os.path.abspath(sys.argv[0]), "main.py"])
+if "resources" in new_streams["body"] and new_streams["body"]["resources"]:
+    # Retrieve the SQS queue we'll use for notifications
+    try:
+        queue = boto3.resource('sqs', region_name=config["region"]).get_queue_by_name(QueueName=config["sqs_queue_name"])
+    except ClientError:
+        status.status_write("Unable to retrieve specified SQS queue")
+    except EndpointConnectionError:
+        status.status_write("Invalid region specified")
     else:
-        status.status_write("No streams available")
-
+        start_streaming(new_streams["body"]["resources"], current_cid)
+        # Only sleep if we have threads opened
+        while threading.active_count() > 0:
+            status.status_write("All threads started, main process sleeping.")
+            # Force a wake up / restart of all streams
+            time.sleep(21600)
+            status.status_write("Restarting service and refreshing all streams.")
+            # Discard all objects and restart the main service thread
+            os.execv(sys.executable, [os.path.abspath(sys.argv[0]), "main.py"])
 else:
     status.status_write("No streams available")

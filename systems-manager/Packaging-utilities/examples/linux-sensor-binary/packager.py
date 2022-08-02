@@ -43,18 +43,21 @@ class SSMPackageUpdater:  # pylint: disable=R0903
         """Update the SSM package."""
         with open(file_to_upload, 'r', encoding="utf-8") as open_file:
             document_content = open_file.read()
-        self._doc_update_or_create(Content=document_content,
-                                   Attachments=[
-                                       {
-                                           'Key': 'SourceUrl',
-                                           'Values': [
-                                               'https://' + s3bucket + '.s3-' + self.region + '.amazonaws.com/falcon',
-                                           ]
-                                       },
-                                   ],
-                                   Name=package,
-                                   DocumentType='Package',
-                                   DocumentFormat='JSON')
+        self._doc_update_or_create(
+            Content=document_content,
+            Attachments=[
+                {
+                    'Key': 'SourceUrl',
+                    'Values': [
+                        f'https://{s3bucket}.s3-{self.region}.amazonaws.com/falcon'
+                    ],
+                }
+            ],
+            Name=package,
+            DocumentType='Package',
+            DocumentFormat='JSON',
+        )
+
 
         print(f'Created ssm package {package}:')
 
@@ -114,7 +117,7 @@ class S3BucketUpdater:  # pylint: disable=R0903
             self._create_bucket(bucket_name)
         for file in file_list:
             file_path = PATH_TO_BUCKET_FOLDER + file
-            self._upload_file(file_path, bucket_name, "falcon/" + file)
+            self._upload_file(file_path, bucket_name, f"falcon/{file}")
 
     def _bucket_exists(self, bucket_name):
         """
@@ -218,7 +221,7 @@ class DistributorPackager:  # pylint: disable=R0903
         return json_data
 
     @staticmethod
-    def _generate_manifest(zip_distros_meta_list, hashes):  # pylint: disable=R0914, R0912
+    def _generate_manifest(zip_distros_meta_list, hashes):    # pylint: disable=R0914, R0912
         """
         Generates the manifest.json file required to create the ssm document
         :param installer_list: List containing key value pairs required to construct the file
@@ -235,22 +238,16 @@ class DistributorPackager:  # pylint: disable=R0903
                 name = each_zip_distro_meta['name']
                 arch_type = each_zip_distro_meta['arch_type']
                 version = each_zip_distro_meta['major_version']
-                if not len(each_zip_distro_meta['minor_version']) == 0:
-                    version = version + "." + each_zip_distro_meta['minor_version']
+                if len(each_zip_distro_meta['minor_version']) != 0:
+                    version = f"{version}." + each_zip_distro_meta['minor_version']
 
-                if name in manifest_packages_meta:
-                    pass
-                else:
+                if name not in manifest_packages_meta:
                     manifest_packages_meta[name] = {}
 
-                if version in manifest_packages_meta[name]:
-                    pass
-                else:
+                if version not in manifest_packages_meta[name]:
                     manifest_packages_meta[name][version] = {}
 
-                if arch_type in manifest_packages_meta[name][version]:
-                    pass
-                else:
+                if arch_type not in manifest_packages_meta[name][version]:
                     manifest_packages_meta[name][version][arch_type] = {}
 
                 manifest_packages_meta[name][version][arch_type] = {'file': each_zip_distro_meta['file']}
@@ -260,23 +257,23 @@ class DistributorPackager:  # pylint: disable=R0903
             obj = {}
             for hash_val in hashes:
                 for key, val in hash_val.items():
-                    obj.update({key: {'checksums': {"sha256": val}}})
+                    obj[key] = {'checksums': {"sha256": val}}
             # print(obj)
             file_list = {"files": obj}
-            manifest_dict.update(file_list)
+            manifest_dict |= file_list
         except (KeyError, ValueError) as err:
             print(f'Exception {err}')
         try:
-            with open((PATH_TO_BUCKET_FOLDER + 'manifest.json'), 'w', encoding="utf-8") as file:
+            with open(f'{PATH_TO_BUCKET_FOLDER}manifest.json', 'w', encoding="utf-8") as file:
                 file.write(json.dumps(manifest_dict))
-        except (FileNotFoundError, FileExistsError, OSError) as err:
+        except OSError as err:
             print(err)
 
     @staticmethod
     def _create_zip_files(directory):
         """Create a zip file from the contents of the specified directory."""
         with zipfile.ZipFile(PATH_TO_BUCKET_FOLDER + directory + '.zip', 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for root, _, file_list in os.walk(directory + '/'):
+            for root, _, file_list in os.walk(f'{directory}/'):
                 for file in file_list:
                     file_path = os.path.join(root, file)
                     zipf.write(file_path, basename(file_path))
@@ -321,7 +318,10 @@ if __name__ == '__main__':
         print("Package has been built successfully.")
     elif region and s3bucket and package_name:
         S3BucketUpdater(region).update(s3bucket, files)
-        SSMPackageUpdater(region).update(package_name, PATH_TO_BUCKET_FOLDER + "manifest.json")
+        SSMPackageUpdater(region).update(
+            package_name, f"{PATH_TO_BUCKET_FOLDER}manifest.json"
+        )
+
         print("Package has been built successfully.")
     else:
         print("Nothing to do ... specify region + bucket or region + bucket + package_name")

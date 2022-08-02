@@ -8,9 +8,7 @@ class Detects:
     """Feed Hosts Class a good access_token and fire away"""
 
     def __init__(self, access_token):
-        self.headers = {
-            'Authorization': 'Bearer ' + access_token
-        }
+        self.headers = {'Authorization': f'Bearer {access_token}'}
         self.base_url = 'https://api.crowdstrike.com'
         self.return_var = {'status_code': '', 'headers': '', 'body': ''}
 
@@ -18,7 +16,7 @@ class Detects:
         # POST
         # Get detect aggregates as specified via json in request body.
         # https://assets.falcon.crowdstrike.com/support/api/swagger.html#/detects/GetAggregateDetects
-        FULL_URL = self.base_url + '/detects/aggregates/detects/GET/v1'
+        FULL_URL = f'{self.base_url}/detects/aggregates/detects/GET/v1'
         HEADERS = self.headers
         BODY = body
         return_var = self.return_var
@@ -38,7 +36,7 @@ class Detects:
         # PATCH
         # Modify the state, assignee, and visibility of detections
         # https://assets.falcon.crowdstrike.com/support/api/swagger.html#/detects/UpdateDetectsByIdsV2
-        FULL_URL = self.base_url + '/detects/entities/detects/v2'
+        FULL_URL = f'{self.base_url}/detects/entities/detects/v2'
         HEADERS = self.headers
         BODY = body
         return_var = self.return_var
@@ -59,7 +57,7 @@ class Detects:
         # View information about detections
         # https://assets.falcon.crowdstrike.com/support/api/swagger.html#/detects/GetDetectSummaries
 
-        FULL_URL = self.base_url + '/detects/entities/summaries/GET/v1'
+        FULL_URL = f'{self.base_url}/detects/entities/summaries/GET/v1'
         HEADERS = self.headers
         BODY = body
         return_var = self.return_var
@@ -79,7 +77,7 @@ class Detects:
         # GET
         # Search for detection IDs that match a given query
         # https://assets.falcon.crowdstrike.com/support/api/swagger.html#/detects/QueryDetects
-        FULL_URL = self.base_url + '/detects/queries/detects/v1'
+        FULL_URL = f'{self.base_url}/detects/queries/detects/v1'
         HEADERS = self.headers
         PARAMS = parameters
         return_var = self.return_var
